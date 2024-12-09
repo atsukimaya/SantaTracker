@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>デンマーク方向WebAR</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        #messageContainer {
+            font-size: 2em;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        #debugInfo {
+            background-color: #e0e0e0;
+            padding: 10px;
+            margin-top: 20px;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>デンマーク方向AR</h1>
+    <div id="messageContainer">デバイスを傾けてみてください</div>
+    <div id="debugInfo">方位センサーを準備中...</div>
+
+    <script>
+        const messageContainer = document.getElementById('messageContainer');
+        const debugInfo = document.getElementById('debugInfo');
+
+        // デンマークの座標（固定値）
+        const DENMARK_LAT = 55;
+        const DENMARK_LON = 10;
+
+        // 2点間の方位角を計算
+        function calculateBearing(userLat, userLon, targetLat, targetLon) {
+            const toRad = (degrees) => degrees * Math.PI / 180;
+            const toDeg = (radians) => radians * 180 / Math.PI;
+
+            const φ1 = toRad(userLat);
+            const φ2 = toRad(targetLat);
+            const Δλ = toRad(targetLon - userLon);
+
+            const y = Math.sin(Δλ) * Math.cos(φ2);
+            const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+            let bearing = toDeg(Math.atan2(y, x));
+
+            // 北を基準に時計回りの角度に調整
+            return (bearing + 360) % 360;
+        }
+
+        // デフォルトの東京の座標を使用
+        const DEFAULT_LAT = 35.6762; // 東京の緯度
+        const DEFAULT_LON = 139.6503; // 東京の経度
+
+        function initOrientationSensor() {
+            function handleOrientation(event) {
+                // デバイスの方位角（コンパスの向き）を取得
+                const compassHeading = event.webkitCompassHeading || event.alpha;
+
+                // デンマークへの方位角を計算（デフォルト座標を使用）
+                const danmarkBearing = calculateBearing(
+                    DEFAULT_LAT, 
+                    DEFAULT_LON, 
+                    DENMARK_LAT, 
+                    DENMARK_LON
+                );
+
+                // デバッグ情報を更新
+                debugInfo.textContent = `
+                    現在のコンパス方位: ${Math.round(compassHeading)}度
+                    デンマーク方向: ${Math.round(danmarkBearing)}度
+                `;
+
+                // デンマークの方向（±15度の許容範囲）
+                const angleDifference = Math.abs(
+                    ((compassHeading - danmarkBearing + 180 + 360) % 360) - 180
+                );
+
+                if (angleDifference <= 15) {
+                    messageContainer.innerHTML = `
+                        <span style="color: red;">サンタがいるよ！🎅</span>
+                    `;
+                    messageContainer.style.backgroundColor = '#e6f2ff';
+                } else {
+                    messageContainer.innerHTML = 'デバイスをデンマークの方向に向けてみてください';
+                    messageContainer.style.backgroundColor = '#fff';
+                }
+            }
+
+            // デバイスの方位センサーをチェック
+            if (window.DeviceOrientationEvent) {
+                window.addEventListener('deviceorientation', handleOrientation);
+            } else {
+                debugInfo.textContent = 'このデバイスは方位センサーに対応していません';
+            }
+        }
+
+        // 方位センサーの初期化
+        initOrientationSensor();
+    </script>
+</body>
+</html>
