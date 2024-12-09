@@ -1,92 +1,103 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebARコンパス</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.134/examples/js/libs/ar.js"></script>
-</head>
-<body style="margin: 0; overflow: hidden;">
-    <script>
-        let scene, camera, renderer, compassGroup;
+import React, { useState, useEffect } from 'react';
 
-        // 初期化
-        function init() {
-            // シーンの作成
-            scene = new THREE.Scene();
+const SantaTrackerAR = () => {
+  const [orientation, setOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
+  const [isSantaDetected, setIsSantaDetected] = useState(false);
+  const [permissionGranted, setPermissionGranted] = useState(false);
 
-            // カメラの作成
-            camera = new THREE.PerspectiveCamera(
-                75,
-                window.innerWidth / window.innerHeight,
-                0.1,
-                1000
-            );
-            camera.position.z = 1;
+  useEffect(() => {
+    // デバイスの向きを取得するイベントリスナー
+    const handleOrientation = (event) => {
+      // イベントから直接値を取得
+      const { alpha = 0, beta = 0, gamma = 0 } = event;
+      
+      setOrientation({ 
+        alpha: alpha || 0, 
+        beta: beta || 0, 
+        gamma: gamma || 0 
+      });
 
-            // レンダラーの作成
-            renderer = new THREE.WebGLRenderer({ alpha: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
+      // デンマークの方向判定のロジック
+      // 簡易的な方向検出（実際のコンパスアルゴリズムではより複雑）
+      const isPointingToDenmark = 
+        Math.abs(alpha - 30) < 15 && // アルファ角度の近似値
+        Math.abs(beta) < 30;          // 垂直角度の範囲
 
-            // 環境光の追加
-            const light = new THREE.AmbientLight(0xffffff, 1);
-            scene.add(light);
+      setIsSantaDetected(isPointingToDenmark);
+    };
 
-            // コンパスグループの作成
-            compassGroup = new THREE.Group();
-
-            // 東西南北の文字を追加
-            const loader = new THREE.FontLoader();
-            loader.load('https://threejs.org/examples/fonts/helvetiker_regular.typeface.json', (font) => {
-                addText('北', 0, 2, 0, font);
-                addText('東', 2, 0, 0, font);
-                addText('南', 0, -2, 0, font);
-                addText('西', -2, 0, 0, font);
-            });
-
-            scene.add(compassGroup);
-
-            // デバイスの方位を取得
-            window.addEventListener('deviceorientation', onDeviceOrientation);
-
-            animate();
+    // デバイスの向きパーミッションをリクエスト
+    const requestPermission = async () => {
+      // iOSデバイス向けの許可リクエスト
+      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+          const response = await DeviceOrientationEvent.requestPermission();
+          if (response === 'granted') {
+            window.addEventListener('deviceorientation', handleOrientation);
+            setPermissionGranted(true);
+          }
+        } catch (error) {
+          console.error('デバイス方向の許可を取得できませんでした', error);
         }
+      } else {
+        // その他のブラウザ
+        window.addEventListener('deviceorientation', handleOrientation);
+        setPermissionGranted(true);
+      }
+    };
 
-        // 文字を作成するヘルパー関数
-        function addText(text, x, y, z, font) {
-            const geometry = new THREE.TextGeometry(text, {
-                font: font,
-                size: 0.5,
-                height: 0.1
-            });
-            const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-            const mesh = new THREE.Mesh(geometry, material);
-            mesh.position.set(x, y, z);
-            compassGroup.add(mesh);
-        }
+    // ページ読み込み時に許可をリクエスト
+    requestPermission();
 
-        // デバイスの方位に応じてグループを回転
-        function onDeviceOrientation(event) {
-            const alpha = event.alpha || 0; // 方位角
-            compassGroup.rotation.y = -THREE.Math.degToRad(alpha);
-        }
+    return () => {
+      window.removeEventListener('deviceorientation', handleOrientation);
+    };
+  }, []);
 
-        // アニメーションループ
-        function animate() {
-            requestAnimationFrame(animate);
-            renderer.render(scene, camera);
-        }
+  return (
+    <div className="h-screen w-full flex flex-col items-center justify-center bg-gradient-to-b from-blue-100 to-blue-300 p-4">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold mb-4 text-red-600">🎄 サンタトラッカー 🎅</h1>
+        
+        {!permissionGranted ? (
+          <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative" role="alert">
+            <p>デバイスの向きの許可が必要です。ブラウザの指示に従ってください。</p>
+          </div>
+        ) : (
+          <>
+            <div className="bg-white rounded-lg shadow-lg p-6 mb-4">
+              <div className="flex items-center justify-center space-x-2 mb-4">
+                <span className="text-blue-500 text-2xl">↔️</span>
+                <p className="text-lg">デンマークの方向を向いてください</p>
+              </div>
+              
+              {isSantaDetected ? (
+                <div className="text-center">
+                  <div className="text-6xl mb-4">🎅</div>
+                  <p className="text-2xl font-bold text-green-600">
+                    ここにサンタがいるよ！
+                  </p>
+                </div>
+              ) : (
+                <div className="text-center">
+                  <p className="text-xl text-gray-600">
+                    デンマークの方向を探しています...
+                  </p>
+                </div>
+              )}
+            </div>
 
-        // ウィンドウサイズ変更時の対応
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+            <div className="text-sm text-gray-600">
+              <p>現在の デバイスの向き:</p>
+              <p>Alpha: {orientation.alpha.toFixed(2)}°</p>
+              <p>Beta: {orientation.beta.toFixed(2)}°</p>
+              <p>Gamma: {orientation.gamma.toFixed(2)}°</p>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
 
-        init();
-    </script>
-</body>
-</html>
+export default SantaTrackerAR;
